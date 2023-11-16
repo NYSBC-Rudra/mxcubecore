@@ -6,4 +6,7 @@
   <interval>100</interval>
   <remote_interval>100</remote_interval>
   <image_name>mxcube_sample_snapshot.jpeg</image_name>
+  <redis_host>10.67.146.131</redis_host>
+  <redis_port>6379</redis_port>
+  <serverkey>bzoom:RAW</serverkey>
 </device>

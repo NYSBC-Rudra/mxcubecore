@@ -5,7 +5,10 @@ import subprocess
 import logging
 import time
 import gevent
+import redis
 
+from PIL import Image
+from io import BytesIO
 from mxcubecore import BaseHardwareObjects
 from mxcubecore import HardwareRepository as HWR
 
@@ -28,6 +31,10 @@ class MDCameraMockup(BaseHardwareObjects.Device):
         self.image = HWR.get_hardware_repository().find_in_repository(self.image_name)
         self.set_is_ready(True)
         self._video_stream_process = None
+        self.redis_key = self.get_property("serverkey")
+        self.redis_server = self.get_property("redis_host")
+        self.redis_port = self.get_property("redis_port")
+        self._redis_connection = redis.Redis(host=self.redis_server, port=self.redis_port, db = 0)
 
     def init(self):
         logging.getLogger("HWR").info("initializing camera object")
@@ -52,10 +59,13 @@ class MDCameraMockup(BaseHardwareObjects.Device):
     def poll(self):
         logging.getLogger("HWR").info("going to poll images")
         while not self.stopper:
-            time.sleep(1)
+            time.sleep(0.2)
             try:
-                img = open(self.image, "rb").read()
-                self.emit("imageReceived", img, 659, 493)
+                image = self._redis_connection.get('bzoom:RAW')
+                byteData = self.convert_image(image) 
+                self.emit("imageReceived", byteData, 659, 493)
+                #img = open(self.image, "rb").read()
+                #self.emit("imageReceived", img, 659, 493)
             except Exception:
                 logging.getLogger("HWR").exception("Could not read image")
 
@@ -157,3 +167,22 @@ class MDCameraMockup(BaseHardwareObjects.Device):
     def restart_streaming(self, size):
         self.stop_streaming()
         self.start_streaming(size)
+
+
+    '''
+    function to convert image data from raw rgb buffer to a different size the returns it as a raw binary file
+    
+    
+    '''
+
+
+    def convert_image(self, data):
+        image = Image.frombuffer("RGB", (1224, 1024), data)
+        image = image.resize((659, 493))
+    # Convert the PIL Image to JPEG binary
+        buffer = BytesIO()
+        image.save(buffer, format="JPEG")
+        jpeg_binary = buffer.getvalue()
+
+        # Convert the image to jpg format and get the data as bytes
+        return jpeg_binary
